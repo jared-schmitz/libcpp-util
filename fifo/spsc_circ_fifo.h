@@ -1,3 +1,10 @@
+//============================================================================
+//                                  libcpp-smp
+//                   A simple threading supplement for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
 #ifndef LIBCPP_SMP_SPSC_CIRC_FIFO_H
 #define LIBCPP_SMP_SPSC_CIRC_FIFO_H
 
