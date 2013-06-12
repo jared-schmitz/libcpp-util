@@ -5,6 +5,8 @@
 
 #include <condition_variable>
 
+namespace libcpp-smp {
+
 class semaphore {
 private:
 	std::condition_variable_any cv;
@@ -54,4 +56,5 @@ public:
 	}
 };
 
+}
 #endif

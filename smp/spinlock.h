@@ -11,6 +11,8 @@
 #define cpu_relax()
 #endif
 
+namespace libcpp-smp {
+
 class spinlock {
 	std::atomic_flag flag;
 
@@ -49,4 +51,8 @@ public:
 		flag.clear(std::memory_order_release);
 	}
 };
+
+}
+
+#undef cpu_relax() // Don't pollute
 #endif

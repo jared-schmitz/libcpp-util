@@ -3,6 +3,8 @@
 
 #include <chrono>
 
+namespace libcpp-smp {
+
 // Lock that can be dropped into a class that has a synchronization aspect but
 // there is no locking needed
 class noop_lock {
@@ -33,4 +35,6 @@ public:
 
 	void unlock() {}
 };
+
+}
 #endif
