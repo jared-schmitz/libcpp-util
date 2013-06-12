@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <type_traits>
 
+namespace libcpp-smp {
+
 template <typename T, size_t N, size_t alignment = std::alignment_of<T>::value>
 class raw_array {
 private:
@@ -30,5 +32,7 @@ public:
 		return reinterpret_cast<T&>(data[index]);
 	}
 };
+
+}
 
 #endif
