@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <memory>
 
+namespace libcpp-smp {
+
 class circ_fifo_base {
 protected:
 	size_t head, tail; // Tail is one past
@@ -152,10 +154,13 @@ public:
 		if (head != 0)
 			return false;
 	}
+
 	void make_linear() {
 		// FIXME: This could be made much faster
 		circ_fifo tmp(*this);
 		swap(tmp);
 	}
 };
+
+} // End namespace
 #endif
