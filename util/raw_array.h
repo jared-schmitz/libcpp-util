@@ -1,19 +1,19 @@
 //============================================================================
-//                                  libcpp-smp
-//                   A simple threading supplement for C++11
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
 //
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_SMP_RAW_ARRAY_H
-#define LIBCPP_SMP_RAW_ARRAY_H
+#ifndef LIBCPP_UTIL_RAW_ARRAY_H
+#define LIBCPP_UTIL_RAW_ARRAY_H
 
 #include <cstddef>
 #include <type_traits>
 
-namespace libcpp-smp {
+namespace cpputil {
 
-template <typename T, size_t N, size_t alignment = std::alignment_of<T>::value>
+template <class T, size_t N, size_t alignment = std::alignment_of<T>::value>
 class raw_array {
 private:
 	using data_type = typename 

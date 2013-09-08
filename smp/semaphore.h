@@ -1,18 +1,18 @@
 //============================================================================
-//                                  libcpp-smp
-//                   A simple threading supplement for C++11
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
 //
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_SMP_SEMAPHORE_H
-#define LIBCPP_SMP_SEMAPHORE_H
+#ifndef LIBCPP_UTIL_SEMAPHORE_H
+#define LIBCPP_UTIL_SEMAPHORE_H
 
-#include "libcpp-smp/smp/spinlock.h"
+#include "libcpp-util/smp/spinlock.h"
 
 #include <condition_variable>
 
-namespace libcpp-smp {
+namespace cpputil {
 
 class semaphore {
 private:

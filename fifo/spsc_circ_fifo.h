@@ -1,15 +1,15 @@
 //============================================================================
-//                                  libcpp-smp
-//                   A simple threading supplement for C++11
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
 //
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_SMP_SPSC_CIRC_FIFO_H
-#define LIBCPP_SMP_SPSC_CIRC_FIFO_H
+#ifndef LIBCPP_UTIL_SPSC_CIRC_FIFO_H
+#define LIBCPP_UTIL_SPSC_CIRC_FIFO_H
 
-#include "libcpp-smp/smp/semaphore.h"
-#include "libcpp-smp/util/raw_array.h"
+#include "libcpp-util/smp/semaphore.h"
+#include "libcpp-util/util/raw_array.h"
 
 #include <atomic>
 #include <memory>
@@ -17,7 +17,7 @@
 #include <cstddef>
 #include <type_traits>
 
-namespace libcpp-smp {
+namespace cpputil {
 
 class spsc_circ_fifo_base {
 protected:

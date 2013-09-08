@@ -1,19 +1,19 @@
 //============================================================================
-//                                  libcpp-smp
-//                   A simple threading supplement for C++11
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
 //
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_SMP_CIRC_FIFO_H
-#define LIBCPP_SMP_CIRC_FIFO_H
+#ifndef LIBCPP_UTIL_CIRC_FIFO_H
+#define LIBCPP_UTIL_CIRC_FIFO_H
 
-#include "libcpp-smp/util/raw_array.h"
+#include "libcpp-util/util/raw_array.h"
 
 #include <cstddef>
 #include <memory>
 
-namespace libcpp-smp {
+namespace cpputil {
 
 class circ_fifo_base {
 protected:
@@ -58,14 +58,12 @@ private:
 	}
 
 	// Copies while linearizing
-	void copy_to_array(std::array<T, N>& dest) {
+	// FIXME: This should copy from another source, not to one
+	void copy_to_array(const std::array<T, N>& src) {
 		size_t out_pos = 0, in_pos = head;
 		for ( ; out_pos < _size; ++out_pos, increment(in_pos))
-			dest[out_pos] = data[in_pos];
+			data[out_pos] = src[in_pos];
 	}
-	using circ_fifo_base::head;
-	using circ_fifo_base::tail;
-	using circ_fifo_base::_size;
 public:
 	typedef T value_type;
 	typedef size_t size_type;

@@ -23,7 +23,7 @@ Data structures:
 C++14 things:
 NB: I am not involved with the C++ working group and I'm sure that my
 implementations will be non-conforming in subtle ways. I did it both out of
-impatience and curiousity. That said I have made a decent effort to test.
+impatience and curiosity. That said I have made a decent effort to test.
 Also I haven't provided workarounds for compilers that haven't caught up with
 C++11 fully. If you want to see a reference implementation, they are around on
 github.

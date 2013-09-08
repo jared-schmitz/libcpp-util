@@ -1,12 +1,12 @@
 //============================================================================
-//                                  libcpp-smp
-//                   A simple threading supplement for C++11
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
 //
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_SMP_SPINLOCK_H
-#define LIBCPP_SMP_SPINLOCK_H
+#ifndef LIBCPP_UTIL_SPINLOCK_H
+#define LIBCPP_UTIL_SPINLOCK_H
 
 #include <atomic>
 #include <chrono>
@@ -18,7 +18,7 @@
 #define cpu_relax()
 #endif
 
-namespace libcpp-smp {
+namespace cpputil {
 
 class spinlock {
 	std::atomic_flag flag;
