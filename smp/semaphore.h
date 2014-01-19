@@ -40,6 +40,13 @@ public:
 		}
 	}
 
+	void post_all() {
+		std::lock_guard<spinlock> lock(s);
+		count += waiters;
+		waiters = 0;
+		cv.notify_all();
+	}
+
 	void wait() {
 		std::unique_lock<spinlock> lock(s);
 		if (count > 0) {
@@ -62,7 +69,8 @@ public:
 		}
 	}
 
-	unsigned value() const {
+	unsigned value() {
+		std::lock_guard<spinlock> lock(s);
 		return count;
 	}
 };

@@ -22,12 +22,6 @@ namespace cpputil {
 
 template <bool MultiProducer, bool MultiConsumer>
 struct atomic_discipline {
-private:
-	std::atomic_bool open;
-	std::atomic<size_t> writers, readers;
-public:
-	atomic_discipline() : open(true), writers(0), readers(0) {}
-
 	typedef std::size_t nonatomic_type;
 	typedef std::atomic_size_t atomic_type;
 
@@ -36,20 +30,6 @@ public:
 	       	std::size_t>::type head_index_type;
 	typedef typename std::conditional<MultiProducer, atomic_type,
 		std::size_t>::type tail_index_type;
-
-	typedef ref_count_handle<std::size_t> write_ticket;
-	typedef ref_count_handle<std::size_t> read_ticket;
-
-	write_ticket write_open() {
-		open = false;
-		return write_ticket(writers);
-	}
-	read_ticket read_open() {
-		return read_ticket(readers);
-	}
-	bool is_closed() const {
-		return !open && writers.load() == 0;
-	}
 
 	static std::size_t increment_index(std::size_t& index, unsigned N) {
 		std::size_t tmp = index;
@@ -75,11 +55,11 @@ template <typename T, size_t N, class AtomicPolicy,
 	 class Alloc = std::allocator<T>>
 class concurrent_queue : public AtomicPolicy {
 private:
+	std::atomic_bool open;
+
 	typename AtomicPolicy::sem_type full, empty;
 	typename AtomicPolicy::head_index_type head;
 	typename AtomicPolicy::tail_index_type tail;
-
-	using AtomicPolicy::is_closed;
 
 	concurrent_queue(const concurrent_queue&) = delete;
 	concurrent_queue& operator=(const concurrent_queue&) = delete;
@@ -99,13 +79,22 @@ private:
 		return is_closed() && full.value() == 0;
 	}
 public:
-	concurrent_queue() : full(0), empty(N), head(0), tail(0) {}
+	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {}
 	// TODO: Other standard library type constructors
 	~concurrent_queue() {
 		while (head != tail) {
 			alloc.destroy(&fifo[head]);
 			head = (head + 1) % N;
 		}
+	}
+
+	bool is_closed() const {
+		return !open;
+	}
+
+	void close() {
+		open = false;
+		full.post_all(); // Make sure to wake any readers
 	}
 
 	constexpr size_t capacity() const {
