@@ -15,8 +15,8 @@ public:
 	typedef const_iterator iterator;
 	typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 	typedef const_reverse_iterator reverse_iterator;
-	typedef size_t size_type;
-	typedef ptrdiff_t difference_type;
+	typedef std::size_t size_type;
+	typedef std::ptrdiff_t difference_type;
 	static constexpr size_type npos = size_type(-1); 
 private:
 	const charT* start;

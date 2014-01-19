@@ -61,5 +61,5 @@ public:
 
 }
 
-#undef cpu_relax() // Don't pollute
+#undef cpu_relax // Don't pollute
 #endif

@@ -61,6 +61,10 @@ public:
 			return false;
 		}
 	}
+
+	unsigned value() const {
+		return count;
+	}
 };
 
 }

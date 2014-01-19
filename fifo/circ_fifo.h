@@ -5,167 +5,184 @@
 //         Licensed under modified BSD license. See LICENSE for details.
 //============================================================================
 
-#ifndef LIBCPP_UTIL_CIRC_FIFO_H
-#define LIBCPP_UTIL_CIRC_FIFO_H
+#ifndef LIBCPP_UTIL_SPSC_CIRC_FIFO_H
+#define LIBCPP_UTIL_SPSC_CIRC_FIFO_H
 
+#include "libcpp-util/smp/semaphore.h"
 #include "libcpp-util/util/raw_array.h"
+#include "libcpp-util/util/ref_count_handle.h"
 
-#include <cstddef>
+#include <atomic>
 #include <memory>
+#include <cassert>
+#include <cstddef>
+#include <type_traits>
 
 namespace cpputil {
 
-class circ_fifo_base {
-protected:
-	size_t head, tail; // Tail is one past
-	size_t _size;
+template <bool MultiProducer, bool MultiConsumer>
+struct atomic_discipline {
+private:
+	std::atomic_bool open;
+	std::atomic<size_t> writers, readers;
 public:
-	circ_fifo_base() : head(0), tail(0), _size(0) {}
-	circ_fifo_base(const circ_fifo_base& o) :
-		head(o.head), tail(o.tail), _size(o._size) {}
-	circ_fifo_base& operator=(const circ_fifo_base& o) {
-		head = o.head;
-		tail = o.tail;
-		_size = o._size;
+	atomic_discipline() : open(true), writers(0), readers(0) {}
+
+	typedef std::size_t nonatomic_type;
+	typedef std::atomic_size_t atomic_type;
+
+	typedef semaphore sem_type;
+	typedef typename std::conditional<MultiConsumer, atomic_type,
+	       	std::size_t>::type head_index_type;
+	typedef typename std::conditional<MultiProducer, atomic_type,
+		std::size_t>::type tail_index_type;
+
+	typedef ref_count_handle<std::size_t> write_ticket;
+	typedef ref_count_handle<std::size_t> read_ticket;
+
+	write_ticket write_open() {
+		open = false;
+		return write_ticket(writers);
 	}
-	size_t size() const { return _size; }
-	bool empty() const { return _size == 0; }
+	read_ticket read_open() {
+		return read_ticket(readers);
+	}
+	bool is_closed() const {
+		return !open && writers.load() == 0;
+	}
+
+	static std::size_t increment_index(std::size_t& index, unsigned N) {
+		std::size_t tmp = index;
+		index = (index + 1) % N;
+		return tmp;
+	}
+
+	static std::size_t increment_index(atomic_type& index, unsigned N) {
+		std::size_t old_count, new_count;
+		do {
+			old_count = index;
+			new_count = (old_count + 1) % N;
+		} while (!index.compare_exchange_strong(old_count, new_count));
+		return old_count;
+	}
+};
+typedef atomic_discipline<false, false> spsc_discipline;
+typedef atomic_discipline<true, false> mpsc_discipline;
+typedef atomic_discipline<false, true> spmc_discipline;
+typedef atomic_discipline<true, true> mpmc_discipline;
+
+struct nonatomic_discipline {
+	struct noop_semaphore {
+		void post() {}
+		void wait() {}
+		unsigned value() const { return 0; }
+		noop_semaphore(unsigned) {}
+		~noop_semaphore() = default;
+	};
+	void close() {}
+	bool is_closed() const { return false; }
+
+	typedef std::size_t nonatomic_type;
+	typedef std::size_t atomic_type;
+
+	typedef noop_semaphore sem_type;
+	typedef std::size_t head_index_type;
+	typedef std::size_t tail_index_type;
+
+	static std::size_t increment_index(std::size_t& index, unsigned N) {
+		std::size_t tmp = index;
+		index = (index + 1) % N;
+		return tmp;
+	}
 };
 
-// An old-fashioned ringbuffer. Doesn't support iteration, only allows head
-// and tail access. As a bonus, it acts as a doubly-ended queue instead of
-// just a FIFO.
-template <typename T, size_t N>
-class circ_fifo : public circ_fifo_base {
+template <typename T, size_t N, typename AtomicPolicy>
+class circ_fifo : public AtomicPolicy {
 private:
+	typename AtomicPolicy::sem_type full, empty;
+	typename AtomicPolicy::head_index_type head;
+	typename AtomicPolicy::tail_index_type tail;
+
+	using AtomicPolicy::is_closed;
+
+	circ_fifo(const circ_fifo&) = delete;
+	circ_fifo& operator=(const circ_fifo&) = delete;
+
 	std::allocator<T> alloc;
-	raw_array<T, N> data;
+	raw_array<T, N> fifo;
 
-	size_t prev(size_t pos) const {
-		if (pos == 0)
-			return N - 1;
-		else
-			return pos - 1;
-	}
-	size_t next(size_t pos) const {
-		return (pos + 1) % N;
-	}
-	void increment(size_t& pos) {
-		pos = next(pos);
-	}
-	void decrement(size_t& pos) {
-		pos = prev(pos);
+	bool pop_value_common(T& val) {
+		auto tmp_head = AtomicPolicy::increment_index(head, N);
+		val = std::move(fifo[tmp_head]);
+		alloc.destroy(&fifo[tmp_head]);
+		empty.post();
+		return true;
 	}
 
-	// Copies while linearizing
-	// FIXME: This should copy from another source, not to one
-	void copy_to_array(const std::array<T, N>& src) {
-		size_t out_pos = 0, in_pos = head;
-		for ( ; out_pos < _size; ++out_pos, increment(in_pos))
-			data[out_pos] = src[in_pos];
+	bool queue_is_finished() const {
+		return is_closed() && full.value() == 0;
 	}
 public:
-	typedef T value_type;
-	typedef size_t size_type;
-	typedef ptrdiff_t difference_type;
-	typedef value_type& reference;
-	typedef const value_type& const_reference;
-	typedef T* pointer;
-	typedef const T* const_pointer;
-
-	circ_fifo() = default;
-	circ_fifo(const circ_fifo& o) : alloc(o.alloc) {
-		o.copy_to_array(data);
-	}
-	circ_fifo& operator=(const circ_fifo& o) {
-		alloc = o.alloc;
-		o.copy_to_array(data);
-	}
+	circ_fifo() : full(0), empty(N), head(0), tail(0) {}
+	// TODO: Other standard library type constructors
 	~circ_fifo() {
 		while (head != tail) {
-			alloc.destroy(&data[head]);
-			increment(head);
+			alloc.destroy(&fifo[head]);
+			head = (head + 1) % N;
 		}
 	}
 
-	constexpr size_t capacity() const { return data.capacity(); }
-	bool full() const { return size() == data.capacity(); }
-
-	void push_back(const T& val) {
-		if (full()) {
-			data[tail] = val;
-			increment(tail);
-			head = tail;
-		} else {
-			alloc.construct(&data[tail], val);
-			increment(tail);
-			++_size;
-		}
-	}
-	void push_front(const T& val) {
-		if (full()) {
-			decrement(head);
-			data[head] = val;
-			tail = head;
-		} else {
-			decrement(head);
-			alloc.construct(&data[head], val);
-			++_size;
-		}
+	constexpr size_t capacity() const {
+		return N;
 	}
 
-	void pop_front() {
-		alloc.destroy(head);
-		increment(head);
-		--_size;
+	template <class... Args>
+	void emplace(Args&&... args) {
+		empty.wait();
+		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
+		alloc.construct(&fifo[tmp_tail], std::forward<Args>(args)...);
+		full.post();
 	}
-	void pop_back() {
-		decrement(tail);
-		alloc.destroy(tail);
-		--_size;
-	}
-
-	const T& front() const {
-		return data[head];
-	}
-	T& front() {
-		return data[head];
+	void push(const T& val) {
+		empty.wait();
+		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
+		alloc.construct(&fifo[tmp_tail], val);
+		full.post();
 	}
 
-	const T& back() const {
-		return data[prev(tail)];
-	}
-	T& back() {
-		return data[prev(tail)];
-	}
-
-	void clear() {
-		while (head != tail) {
-			alloc.destroy(&data[head]);
-			increment(head);
-		}
-		_size = 0;
-		head = 0;
-		tail = 0;
-       	}
-
-	void swap(circ_fifo& other) {
-		circ_fifo tmp = other;
-		other = *this;
-		*this = tmp;
+	void push(T&& val) {
+		empty.wait();
+		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
+		alloc.construct(&fifo[tmp_tail], std::move(val));
+		full.post();
 	}
 
-	bool is_linear() const {
-		if (head != 0)
+	bool pop_value(T& val) {
+		if (queue_is_finished())
 			return false;
+		full.wait();
+		return pop_value_common(val);
 	}
 
-	void make_linear() {
-		// FIXME: This could be made much faster
-		circ_fifo tmp(*this);
-		swap(tmp);
+	bool try_pop_value(T& val) {
+		if (queue_is_finished())
+			return false;
+		if (!full.try_wait())
+			return false;
+		return pop_value_common(val);
 	}
 };
+
+template <typename T, unsigned N>
+using nonatomic_circ_fifo = circ_fifo<T, N, nonatomic_discipline>;
+template <typename T, unsigned N>
+using spsc_circ_fifo = circ_fifo<T, N, spsc_discipline>;
+template <typename T, unsigned N>
+using spmc_circ_fifo = circ_fifo<T, N, spmc_discipline>;
+template <typename T, unsigned N>
+using mpsc_circ_fifo = circ_fifo<T, N, mpsc_discipline>;
+template <typename T, unsigned N>
+using mpmc_circ_fifo = circ_fifo<T, N, mpmc_discipline>;
 
 } // End namespace
 #endif

@@ -8,7 +8,6 @@ typename basic_string_ref<charT, traits>::size_type
 KMP(basic_string_ref<charT, traits> text,
 		basic_string_ref<charT, traits> word)
 {
-	// FIXME: Replace with dynarray when it comes around
 	std::vector<int> T(word.size() + 1, -1);
 
 	// Easy outs
