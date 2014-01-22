@@ -59,6 +59,39 @@ public:
 	}
 };
 
+// Useful to have in situations where cacheline contention matters.
+template <unsigned N>
+class padded_spinlock {
+private:
+	alignas(N) spinlock s;
+	char _padding[N - sizeof(s)];
+public:
+	void lock() {
+		return s.lock();
+	}
+
+	bool try_lock() {
+		return s.try_lock();
+	}
+	
+	template <class Rep, class Period>
+	bool try_lock_for(const std::chrono::duration<Rep,Period>& duration) {
+		return s.try_lock_for(duration);
+	}
+
+	template <class Clock, class Duration>
+	bool try_lock_until(
+			const std::chrono::time_point<Clock, Duration>& when) {
+		return s.try_lock_until(when);
+	}
+
+	void unlock() {
+		return s.unlock();
+	}
+};
+
+using cacheline_spinlock = padded_spinlock<64>;
+
 }
 
 #undef cpu_relax // Don't pollute

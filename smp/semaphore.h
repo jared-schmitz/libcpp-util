@@ -19,7 +19,7 @@ private:
 	std::condition_variable_any cv;
 	unsigned count;
 	unsigned waiters;
-	spinlock s;
+	cacheline_spinlock s;
 
 	semaphore(const semaphore&) = delete;
 	semaphore& operator=(const semaphore&) = delete;
@@ -31,7 +31,7 @@ public:
 	~semaphore() = default;
 
 	void post() {
-		std::unique_lock<spinlock> lock(s);
+		std::unique_lock<cacheline_spinlock> lock(s);
 		count++;
 		if (waiters > 0) {
 			waiters--;
@@ -41,14 +41,14 @@ public:
 	}
 
 	void post_all() {
-		std::lock_guard<spinlock> lock(s);
+		std::lock_guard<cacheline_spinlock> lock(s);
 		count += waiters;
 		waiters = 0;
 		cv.notify_all();
 	}
 
 	void wait() {
-		std::unique_lock<spinlock> lock(s);
+		std::unique_lock<cacheline_spinlock> lock(s);
 		if (count > 0) {
 			count--;
 		} else {
@@ -60,7 +60,7 @@ public:
 	}
 
 	bool try_wait() {
-		std::lock_guard<spinlock> lock(s);
+		std::lock_guard<cacheline_spinlock> lock(s);
 		if (count > 0) {
 			count--;
 			return true;
@@ -70,7 +70,7 @@ public:
 	}
 
 	unsigned value() {
-		std::lock_guard<spinlock> lock(s);
+		std::lock_guard<cacheline_spinlock> lock(s);
 		return count;
 	}
 };
