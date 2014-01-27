@@ -39,7 +39,7 @@ public:
 		: start(&elem), len(1) {}
 	array_ref(const T* data, size_t length)
 		: start(data), len(length) {}
-	array_ref(const T* start, const T* end)
+	array_ref(const T* data, const T* end)
 		: start(data), len(end - start) {}
 
 	template <typename Alloc>
