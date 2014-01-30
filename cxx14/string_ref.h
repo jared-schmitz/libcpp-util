@@ -1,6 +1,8 @@
 #include <cstddef>
+#include <limits.h>
 #include <string>
-#include "array_ref.h"
+#include <bitset>
+#include "libcpp-util/cxx14/array_ref.h"
 #include "string_algo.h"
 
 template<typename charT, typename traits = std::char_traits<charT>>
@@ -21,6 +23,16 @@ public:
 private:
 	const charT* start;
 	size_t len;
+
+	// TODO: Hm, if this is too large to fit into a size_t, we're SOL.
+	static constexpr size_t charT_bits = 1 << (sizeof(charT) * CHAR_BIT);
+	typedef std::bitset<charT_bits> charT_set;
+
+	static void init_bitset(charT_set& set, basic_string_ref s) {
+		for (auto c : s)
+			set.set(s);
+	}
+
 public:
 	// construct/copy
 	constexpr basic_string_ref() : start(nullptr), len(0) {}
@@ -127,17 +139,46 @@ public:
 	size_type find(charT c) const {
 		return std::distance(data(), traits::find(data(), size(), c));
 	}
-	size_type rfind(basic_string_ref s) const;
-	size_type rfind(charT c) const;
+	size_type rfind(basic_string_ref s) const {
+		if (s.empty())
+			return 0;
+		if (s.size() > size())
+			return npos;
+		for (const charT* p = data() + size() - s.size(); p >= data();
+				--p)
+			if (traits::compare(p, s.data(), size()))
+				return p - data();
+		return npos;
+	}
+	size_type rfind(charT c) const {
+		for (const charT* p = data() + size() - 1; p >= data(); --p)
+			if (traits::eq(*p, c))
+				return p - data();
+		return npos;
+	}
 	size_type find_first_of(basic_string_ref s) const {
-		const charT *p = find(s);
-		return p ? std::distance(data(), p) : npos;
+		if (s.empty())
+			return 0;
+		charT_set chars;
+		init_bitset(chars, s);
+		for (const charT* p = data(); p < data() + size(); ++p)
+			if (chars.test(*p))
+				return p - data();
+		return npos;
 	}
 	size_type find_first_of(charT c) const {
-		const charT *p = find(c);
-		return p ? std::distance(data(), p) : npos;
+		return find(c);
 	}
-	size_type find_first_not_of(basic_string_ref s) const;
+	size_type find_first_not_of(basic_string_ref s) const {
+		if (s.empty())
+			return 0;
+		charT_set chars;
+		init_bitset(chars, s);
+		for (const charT* p = data(); p < data() + size(); ++p)
+			if (!chars.test(*p))
+				return p - data();
+		return npos;
+	}
 	size_type find_first_not_of(charT c) const {
 		for (const charT* p = data(); p < data() + size(); ++p)
 			if (!traits::eq(*p, c))
@@ -149,10 +190,18 @@ public:
 		return p ? std::distance(data(), p) : npos;
 	}
 	size_type find_last_of(charT c) const {
-		const charT *p = rfind(c);
-		return p ? std::distance(data(), p) : npos;
+		return rfind(c);
 	}
-	size_type find_last_not_of(basic_string_ref s) const;
+	size_type find_last_not_of(basic_string_ref s) const {
+		if (s.empty())
+			return 0;
+		charT_set chars;
+		init_bitset(chars, s);
+		for (const charT* p = data() + size() - 1; p >= data(); --p)
+			if (!chars.test(*p))
+				return p - data();
+		return npos;
+	}
 	size_type find_last_not_of(charT c) const {
 		for (const charT* p = data() + size() - 1; p >= data(); --p)
 			if (!traits::eq(*p, c))
