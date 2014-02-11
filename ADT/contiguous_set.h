@@ -15,6 +15,13 @@ private:
 	bool equivalent(const Key& k1, const Key& k2) {
 		return !key_comp()(k1, k2) && !key_comp()(k2, k1);
 	}
+
+	// Checks positions to the left and right to see if ordering is correct
+	bool good_hint(const_iterator hint, const value_type& k) {
+		if (hint != begin()) {
+
+		}
+	}
 public:
 	typedef Key key_type;
 	typedef Key value_type;
@@ -60,15 +67,19 @@ public:
 	const_reverse_iterator crend() const { return storage.crend(); }
 
 	// Accessors for functions
-	bool empty() const { return storage.empty(); }
-	size_type size() const { return storage.size(); }
-	size_type max_size() const { return storage.max_size(); }
+	bool empty() const noexcept { return storage.empty(); }
+	size_type size() const noexcept { return storage.size(); }
+	size_type max_size() const noexcept { return storage.max_size(); }
 
 	key_compare key_comp() const { return Compare(); }
 	value_compare value_comp() const { return Compare(); }
 
+	// Functions not in std::set but useful from a performance angle
+	void reserve(size_type count) { storage.reserve(count); }
+	size_type capacity() const { return storage.capacity(); }
+
 	// Modifiers
-	void clear() { storage.clear(); }
+	void clear() noexcept { storage.clear(); }
 	size_type erase(const key_type& key) {
 		auto I = find(key);
 		if (I != end())
@@ -80,8 +91,18 @@ public:
 	}
 
 	// insert, emplace, emplace_hint
-	std::pair<iterator, bool> insert(const value_type& value);
-	std::pair<iterator, bool> insert(value_type&& value);
+	std::pair<iterator, bool> insert(const value_type& value) {
+		auto I = lower_bound(value);
+		if (I != end() && equivalent(*I, value))
+			return std::make_pair(I, false); // Got it already
+		storage.insert(value);
+	}
+	std::pair<iterator, bool> insert(value_type&& value) {
+		auto I = lower_bound(value);
+		if (I != end() && equivalent(*I, value))
+			return std::make_pair(I, false); // Got it already
+		storage.insert(I, std::move(value));
+	}
 
 	iterator insert(const_iterator hint, const value_type& value);
 	iterator insert(const_iterator hint, value_type&& value);
@@ -93,6 +114,7 @@ public:
 		size_type old_size = size();
 		storage.insert(end(), first, last);
 		std::sort(begin() + old_size, end(), Compare());
+		// FIXME: This will keep equal elements...
 		std::inplace_merge(begin(), begin() + old_size, end(),
 				Compare());
 	}
