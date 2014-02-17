@@ -8,19 +8,15 @@
 #include <memory>
 #include <vector>
 
-template <class Key, class Compare = std::less<Key>>
-class contiguous_set {
+template <class Key, class Compare = std::less<Key>,
+	 class Allocator = std::allocator<Key>>
+class sorted_vector {
 private:
-	std::vector<Key> storage;
-	bool equivalent(const Key& k1, const Key& k2) {
-		return !key_comp()(k1, k2) && !key_comp()(k2, k1);
-	}
-
-	// Checks positions to the left and right to see if ordering is correct
-	bool good_hint(const_iterator hint, const value_type& k) {
-		if (hint != begin()) {
-
-		}
+	std::vector<Key, Allocator> storage;
+protected:
+	Compare comp;
+	std::reference_wrapper<Compare> comp_refwrap() const {
+		return std::ref(comp);
 	}
 public:
 	typedef Key key_type;
@@ -38,16 +34,49 @@ public:
 	typedef typename decltype(storage)::const_iterator const_iterator;
 	typedef std::reverse_iterator<iterator> reverse_iterator;
 	typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+private:
+	bool equivalent(const Key& k1, const Key& k2) {
+		return !comp(k1, k2) && !comp(k2, k1);
+	}
+	bool greater(const Key& k1, const Key& k2) {
+		return comp(k2, k1);
+	}
+
+	// Checks positions to the left and right to see if ordering is correct
+	bool good_hint(const_iterator hint, const value_type& k) {
+		if (hint != begin() && !greater(k, *std::prev(hint)))
+			return false;
+		if (hint != end() && !comp(k, *hint))
+			return false;
+		return true;
+	}
+public:
 
 	// Constructors, assignment, destructor
 	// TODO: All the ctors
-	contiguous_set& operator=(const contiguous_set&) = default;
-	contiguous_set& operator=(contiguous_set&&) = default;
-	contiguous_set& operator=(std::initializer_list<value_type> ilist) {
+	explicit sorted_vector(const Compare& comp = Compare(),
+			const Allocator& = Allocator()) : comp(comp)
+
+	}
+	template <class InputIt>
+	sorted_vector(InputIt first, InputIt last,
+	const Compare& comp = Compare(), const Allocator& = Allocator());
+	sorted_vector(const sorted_vector<Key,Compare,Allocator>& x);
+	sorted_vector(sorted_vector<Key,Compare,Allocator>&& x);
+	explicit sorted_vector(const Allocator&);
+	sorted_vector(const sorted_vector&, const Allocator&);
+	sorted_vector(sorted_vector&&, const Allocator&);
+	sorted_vector(std::initializer_list<value_type>,
+			const Compare& = Compare(),
+			const Allocator& = Allocator());
+
+	sorted_vector& operator=(const sorted_vector&) = default;
+	sorted_vector& operator=(sorted_vector&&) = default;
+	sorted_vector& operator=(std::initializer_list<value_type> ilist) {
 		storage.assign(ilist);
 	}
 
-	~contiguous_set() = default;
+	~sorted_vector() = default;
 
 	// Iterators
 	iterator begin() { return storage.begin(); }
@@ -71,8 +100,8 @@ public:
 	size_type size() const noexcept { return storage.size(); }
 	size_type max_size() const noexcept { return storage.max_size(); }
 
-	key_compare key_comp() const { return Compare(); }
-	value_compare value_comp() const { return Compare(); }
+	key_compare key_comp() const { return comp; }
+	value_compare value_comp() const { return comp; }
 
 	// Functions not in std::set but useful from a performance angle
 	void reserve(size_type count) { storage.reserve(count); }
@@ -86,7 +115,7 @@ public:
 			storage.erase(I);
 	}
 
-	void swap(contiguous_set& other) {
+	void swap(sorted_vector& other) {
 		storage.swap(other.storage);
 	}
 
@@ -104,19 +133,30 @@ public:
 		storage.insert(I, std::move(value));
 	}
 
-	iterator insert(const_iterator hint, const value_type& value);
-	iterator insert(const_iterator hint, value_type&& value);
+	iterator insert(const_iterator hint, const value_type& value) {
+		if (good_hint(hint, value))
+			storage.insert(value);
+		else
+			insert(value);
+	}
+	iterator insert(const_iterator hint, value_type&& value) {
+		if (good_hint(hint, value))
+			storage.insert(std::move(value));
+		else
+			insert(std::move(value));
+	}
 
 	template <class InputIt>
 	void insert(InputIt first, InputIt last) {
 		// Procedure is to insert the new elements at the end, sort
 		// them, then do an inplace merge of the entire vector.
 		size_type old_size = size();
+		// FIXME: This has a pretty nasty complexity...
 		storage.insert(end(), first, last);
-		std::sort(begin() + old_size, end(), Compare());
-		// FIXME: This will keep equal elements...
+		std::sort(begin() + old_size, end(), comp_refwrap());
 		std::inplace_merge(begin(), begin() + old_size, end(),
-				Compare());
+				comp_refwrap());
+		std::unique(begin(), end(), comp_refwrap());
 	}
 
 	void insert(std::initializer_list<value_type> ilist) {
@@ -154,37 +194,35 @@ public:
 
 	iterator find(const Key& key) {
 		auto I = lower_bound(key);
-		if (I == end() || key_comp()(key, *I))
+		if (I == end() || comp(key, *I))
 			return I;
 		return end();
 	}
-	const_iterator find(const Key& key) const {
-		return const_cast<contiguous_set<Key, Compare>*>(this)->find(key);
+	const_iterator find(const Key& k) const {
+		return const_cast<sorted_vector<Key, Compare>*>(this)->find(k);
 	}
 
 	iterator upper_bound(const Key& key) {
-		return std::upper_bound(begin(), end(), key, Compare());
+		return std::upper_bound(begin(), end(), key, comp_refwrap());
 	}
 	const_iterator upper_bound(const Key& key) const {
-		return std::upper_bound(begin(), end(), key, Compare());
+		return std::upper_bound(begin(), end(), key, comp_refwrap());
 	}
 
 	iterator lower_bound(const Key& key) {
-		return std::lower_bound(begin(), end(), key, Compare());
+		return std::lower_bound(begin(), end(), key, comp_refwrap());
 	}
 	const_iterator lower_bound(const Key& key) const {
-		return std::lower_bound(begin(), end(), key, Compare());
+		return std::lower_bound(begin(), end(), key, comp_refwrap());
 	}
 
 	std::pair<iterator, iterator> equal_range(const Key& key) {
-		return std::equal_range(begin(), end(), key, Compare());
+		return std::equal_range(begin(), end(), key, comp_refwrap());
 	}
 
 	std::pair<const_iterator, const_iterator>
 	equal_range(const Key& key) const {
-		return std::equal_range(begin(), end(), key, Compare());
+		return std::equal_range(begin(), end(), key, comp_refwrap());
 	}
-
 };
-
 #endif
