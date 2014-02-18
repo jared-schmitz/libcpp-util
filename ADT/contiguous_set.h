@@ -15,7 +15,9 @@ private:
 	std::vector<Key, Allocator> storage;
 protected:
 	Compare comp;
-	std::reference_wrapper<Compare> comp_refwrap() const {
+	// FIXME: Figure out the deal with constness and standard algos for the
+	// comparator
+	std::reference_wrapper<Compare> comp_refwrap() {
 		return std::ref(comp);
 	}
 public:
@@ -31,7 +33,13 @@ public:
 	typedef typename std::allocator_traits<allocator_type>::pointer pointer;
 	typedef typename std::allocator_traits<allocator_type>::const_pointer const_pointer;
 	typedef typename decltype(storage)::iterator iterator;
+// My libstdc++ version doesn't have correct insert/erase iterator decls
+// (fixed in trunk). Use this ugly ifdef for now.
+#ifndef CORRECT_CONST_ITERATOR_CONVENTIONS
+	typedef typename decltype(storage)::iterator const_iterator;
+#else
 	typedef typename decltype(storage)::const_iterator const_iterator;
+#endif
 	typedef std::reverse_iterator<iterator> reverse_iterator;
 	typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 private:
@@ -50,30 +58,47 @@ private:
 			return false;
 		return true;
 	}
+	void sort_unique(iterator first, iterator last) {
+		std::sort(first, last, comp_refwrap());
+		auto f = [this](const value_type& a, const value_type& b) -> bool {
+			return this->equivalent(a, b);
+		};
+		storage.erase(std::unique(first, last, f), end());
+	}
 public:
 
 	// Constructors, assignment, destructor
-	// TODO: All the ctors
-	explicit sorted_vector(const Compare& comp = Compare(),
-			const Allocator& = Allocator()) : comp(comp)
-
-	}
+	explicit sorted_vector(const Compare& c = Compare(),
+			const Allocator& a = Allocator())
+		: storage(a), comp(c) { }
 	template <class InputIt>
 	sorted_vector(InputIt first, InputIt last,
-	const Compare& comp = Compare(), const Allocator& = Allocator());
-	sorted_vector(const sorted_vector<Key,Compare,Allocator>& x);
-	sorted_vector(sorted_vector<Key,Compare,Allocator>&& x);
-	explicit sorted_vector(const Allocator&);
-	sorted_vector(const sorted_vector&, const Allocator&);
-	sorted_vector(sorted_vector&&, const Allocator&);
-	sorted_vector(std::initializer_list<value_type>,
-			const Compare& = Compare(),
-			const Allocator& = Allocator());
+	const Compare& c = Compare(), const Allocator& a= Allocator())
+		: storage(first, last, a), comp(c) {
+		sort_unique(begin(), end());
+	}
+	sorted_vector(const sorted_vector<Key,Compare,Allocator>& x) = default;
+	sorted_vector(sorted_vector<Key,Compare,Allocator>&& x) = default;
+
+	explicit sorted_vector(const Allocator& a) : storage(a) { }
+
+	sorted_vector(const sorted_vector& x, const Allocator& a)
+		: storage(x, a) { }
+	sorted_vector(sorted_vector&& x, const Allocator& a)
+		: storage(std::move(x), a) { }
+
+	sorted_vector(std::initializer_list<value_type> ilist,
+			const Compare& c = Compare(),
+			const Allocator& a = Allocator())
+		: storage(ilist, a), comp(c) {
+		sort_unique(begin(), end());
+	}
 
 	sorted_vector& operator=(const sorted_vector&) = default;
 	sorted_vector& operator=(sorted_vector&&) = default;
 	sorted_vector& operator=(std::initializer_list<value_type> ilist) {
 		storage.assign(ilist);
+		sort_unique(begin(), end());
 	}
 
 	~sorted_vector() = default;
@@ -109,10 +134,23 @@ public:
 
 	// Modifiers
 	void clear() noexcept { storage.clear(); }
+
+	iterator erase(const_iterator pos) {
+		return storage.erase(pos);
+	}
+
+	iterator erase(const_iterator first, const_iterator last) {
+		return storage.erase(first, last);
+	}
+
 	size_type erase(const key_type& key) {
 		auto I = find(key);
-		if (I != end())
+		if (I != end()) {
 			storage.erase(I);
+			return 1;
+		} else {
+			return 0;
+		}
 	}
 
 	void swap(sorted_vector& other) {
@@ -124,39 +162,43 @@ public:
 		auto I = lower_bound(value);
 		if (I != end() && equivalent(*I, value))
 			return std::make_pair(I, false); // Got it already
-		storage.insert(value);
+		auto RetI = storage.insert(I, value);
+		return std::make_pair(RetI, true);
 	}
 	std::pair<iterator, bool> insert(value_type&& value) {
 		auto I = lower_bound(value);
-		if (I != end() && equivalent(*I, value))
+		if (I != end() && equivalent(*I, value)) {
 			return std::make_pair(I, false); // Got it already
-		storage.insert(I, std::move(value));
+		}
+		auto RetI = storage.insert(I, std::move(value));
+		return std::make_pair(RetI, true);
 	}
 
 	iterator insert(const_iterator hint, const value_type& value) {
 		if (good_hint(hint, value))
-			storage.insert(value);
+			storage.insert(hint, value);
 		else
 			insert(value);
 	}
 	iterator insert(const_iterator hint, value_type&& value) {
 		if (good_hint(hint, value))
-			storage.insert(std::move(value));
+			storage.insert(hint, std::move(value));
 		else
 			insert(std::move(value));
 	}
 
 	template <class InputIt>
 	void insert(InputIt first, InputIt last) {
-		// Procedure is to insert the new elements at the end, sort
-		// them, then do an inplace merge of the entire vector.
-		size_type old_size = size();
-		// FIXME: This has a pretty nasty complexity...
-		storage.insert(end(), first, last);
-		std::sort(begin() + old_size, end(), comp_refwrap());
-		std::inplace_merge(begin(), begin() + old_size, end(),
-				comp_refwrap());
-		std::unique(begin(), end(), comp_refwrap());
+		// If we don't have any pre-existing elements, just sort and
+		// unique.
+		if (empty()) {
+			storage.insert(begin(), first, last);
+			sort_unique(begin(), end());
+			return;
+		}
+		storage.reserve(std::distance(first, last) + storage.size());
+		while (first != last)
+			insert(*first++);
 	}
 
 	void insert(std::initializer_list<value_type> ilist) {
@@ -224,5 +266,20 @@ public:
 	equal_range(const Key& key) const {
 		return std::equal_range(begin(), end(), key, comp_refwrap());
 	}
+
+	bool validate() {
+		bool sorted = std::is_sorted(begin(), end(), comp_refwrap());
+		auto f = [this](const value_type& a, const value_type& b) -> bool {
+			return this->equivalent(a, b);
+		};
+		bool unique = std::adjacent_find(begin(), end(), f) == end();
+		return sorted && unique;
+	}
 };
+
+// TODO: Implement the std::swap specialization
+
+template <class Key, class Compare = std::less<Key>,
+	 class Allocator = std::allocator<Key>>
+using contiguous_set = sorted_vector<Key, Compare, Allocator>;
 #endif
