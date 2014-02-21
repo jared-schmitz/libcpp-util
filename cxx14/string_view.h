@@ -1,3 +1,6 @@
+#ifndef LIBCPP_UTIL_STRING_VIEW_H
+#define LIBCPP_UTIL_STRING_VIEW_H
+
 #include <cstddef>
 #include <limits.h>
 #include <string>
@@ -279,3 +282,4 @@ unsigned long long stoull(const wstring_view & str, size_t * idx=0, int base=10)
 float stof(const wstring_view & str, size_t * idx=0);
 double stod(const wstring_view & str, size_t * idx=0);
 long double stold(const wstring_view & str, size_t * idx=0);
+#endif
