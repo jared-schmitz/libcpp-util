@@ -7,11 +7,17 @@
 template <typename T, unsigned N>
 class objstack_allocator {
 private:
-	unsigned char storage[N];
+	unsigned char *storage;
 	std::size_t cursor;
 public:
 	typedef T value_type;
-	objstack_allocator() : cursor(0) {}
+	objstack_allocator() : storage(new unsigned char[N]), cursor(0) {}
+	~objstack_allocator() {
+		delete storage;
+	}
+
+	template <typename U>
+	objstack_allocator(const objstack_allocator<U>& other);
 
 	T* allocate(std::size_t n) {
 		T* ret = static_cast<T*>(storage[cursor]);
