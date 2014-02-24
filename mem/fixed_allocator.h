@@ -28,10 +28,12 @@ public:
 		: alloc(nullptr), dealloc(nullptr), block_size(block_size),
 		num_blocks(num_blocks) {}
 
-	void *allocate(std::size_t n) {
+	void *allocate() {
+		// TODO: Allocate one block
 	}
 
-	void deallocate(void *p, std::size_t n) {
+	void deallocate(void *p) {
+		// TODO: Deallocate one block
 	}	
 };
 
@@ -78,8 +80,27 @@ public:
 			fixed_allocator::max_num_blocks) {}
 	~fixed_type_allocator() = default;
 
+	template <typename U>
+	fixed_type_allocator(const fixed_type_allocator<U>& other)
+		: fixed_allocator(sizeof(T), fixed_allocator::max_num_blocks) {
+	}
+
 	// TODO: Need to be able to rebind, which requires reinitializing the
-	// block-size and what not. Also need to write magic casting that wraps
-	// allocate/deallocate.
+	// block-size and what not.
+	T *allocator(std::size_t n, T* hint = 0) {
+		// We ignore the hint, as it would take linear time to map back
+		// to the chunk anyway, sorry :)
+		(void)hint;
+		if (n > 1)
+			return ::new T[n];
+		return static_cast<T*>(fixed_allocator::allocate());
+	}
+
+	void deallocate(T* p, std::size_t n) {
+		if (n > 1)
+			delete T[n];
+		else
+			fixed_allocator::deallocate(p);
+	}
 };
 #endif

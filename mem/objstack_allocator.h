@@ -11,7 +11,7 @@ private:
 	std::size_t cursor;
 public:
 	typedef T value_type;
-	objstack_allocator() : storage(new unsigned char[N]), cursor(0) {}
+	objstack_allocator() : storage(new unsigned char[T * N]), cursor(0) {}
 	~objstack_allocator() {
 		delete storage;
 	}
