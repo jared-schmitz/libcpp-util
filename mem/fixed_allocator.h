@@ -21,12 +21,15 @@ private:
 	chunk *dealloc;
 	std::size_t block_size;
 	unsigned char num_blocks;
+
 public:
 	static constexpr unsigned char max_num_blocks =
-		std::numeric_limits<unsigned char>::max();
+	    std::numeric_limits<unsigned char>::max();
+
 	fixed_allocator(std::size_t block_size, unsigned char num_blocks)
 		: alloc(nullptr), dealloc(nullptr), block_size(block_size),
-		num_blocks(num_blocks) {}
+		  num_blocks(num_blocks) {
+	}
 
 	void *allocate() {
 		// TODO: Allocate one block
@@ -34,7 +37,7 @@ public:
 
 	void deallocate(void *p) {
 		// TODO: Deallocate one block
-	}	
+	}
 };
 
 void fixed_allocator::chunk::init(std::size_t block_size,
@@ -56,18 +59,18 @@ void *fixed_allocator::chunk::allocate(std::size_t block_size) {
 	if (num_blocks_free == 0)
 		return nullptr;
 	--num_blocks_free;
-	unsigned char* ret = data[first_free_block * block_size];
-	first_free_block = *ret; 
+	unsigned char *ret = data[first_free_block * block_size];
+	first_free_block = *ret;
 	return ret;
 }
 
 void fixed_allocator::chunk::deallocate(void *p, std::size_t block_size) {
-	unsigned char *release = static_cast<unsigned char*>(p);
+	unsigned char *release = static_cast<unsigned char *>(p);
 	// Link to the head
 	*release = first_free_block;
 	// Make the head point here
-	first_free_block = static_cast<unsigned char>((release - data) /
-			block_size);
+	first_free_block =
+	    static_cast<unsigned char>((release - data) / block_size);
 	++num_blocks_free;
 }
 
@@ -76,27 +79,28 @@ template <typename T>
 class fixed_type_allocator : public fixed_allocator {
 public:
 	typedef T value_type;
-	fixed_type_allocator() : fixed_allocator(sizeof(T),
-			fixed_allocator::max_num_blocks) {}
+	fixed_type_allocator()
+		: fixed_allocator(sizeof(T), fixed_allocator::max_num_blocks) {
+	}
 	~fixed_type_allocator() = default;
 
 	template <typename U>
-	fixed_type_allocator(const fixed_type_allocator<U>& other)
+	fixed_type_allocator(const fixed_type_allocator<U> &other)
 		: fixed_allocator(sizeof(T), fixed_allocator::max_num_blocks) {
 	}
 
 	// TODO: Need to be able to rebind, which requires reinitializing the
 	// block-size and what not.
-	T *allocator(std::size_t n, T* hint = 0) {
+	T *allocator(std::size_t n, T *hint = 0) {
 		// We ignore the hint, as it would take linear time to map back
 		// to the chunk anyway, sorry :)
 		(void)hint;
 		if (n > 1)
 			return ::new T[n];
-		return static_cast<T*>(fixed_allocator::allocate());
+		return static_cast<T *>(fixed_allocator::allocate());
 	}
 
-	void deallocate(T* p, std::size_t n) {
+	void deallocate(T *p, std::size_t n) {
 		if (n > 1)
 			delete T[n];
 		else
