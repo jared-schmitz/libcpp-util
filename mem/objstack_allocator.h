@@ -2,50 +2,44 @@
 #define LIBCPP_UTIL_OBJSTACK_ALLOCATOR_H
 
 #include <cstddef>
+#include <new>
 #include <memory>
 
 template <unsigned N>
 class objstack {
 private:
 	unsigned char storage[N];
-	std::size_t cursor;
-
+	unsigned size;
 public:
-	objstack() : cursor(0) {
-	}
-	void *allocate(std::size_t n) {
-		if (cursor > N - n)
-			return nullptr;
-		void *ret = storage[cursor];
-		cursor += n;
-		return ret;
+	objstack() : size(N) {}
+
+	void *allocate(std::size_t n, std::size_t alignment) {
+		return std::align(n, alignment, storage + (N - size), size);
 	}
 };
 
 template <typename T, unsigned N>
 class objstack_allocator {
 private:
-	std::shared_ptr<objstack<N * sizeof(T)>> stack;
-
+	std::shared_ptr<objstack<N>> stack;
 public:
 	typedef T value_type;
-	objstack_allocator() : stack(std::make_shared()) {
-	}
-	objstack_allocator(const objstack_allocator &) = default;
-	objstack_allocator(objstack_allocator &&) = default;
-	objstack_allocator &operator=(const objstack_allocator &) = default;
-	objstack_allocator &operator=(objstack_allocator &&) = default;
+	objstack_allocator() : stack(std::make_shared()) {}
+	objstack_allocator(objstack_allocator&&) noexcept = default;
+	objstack_allocator(const objstack_allocator&) noexcept = default;
+	objstack_allocator& operator=(objstack_allocator&&) noexcept = default;
+	objstack_allocator& operator=(const objstack_allocator&) noexcept = default;
 	~objstack_allocator() = default;
 
-	template <typename U>
-	objstack_allocator(const objstack_allocator<U> &other)
-		: stack(other.stack) {
-	}
+	template <typename U, unsigned N>
+	objstack_allocator(const objstack_allocator<U, N>& other) noexcept
+       	: stack(other.stack) {} 
 
-	T *allocate(std::size_t n) {
-		if (T *ptr = static_cast<T*>(stack->allocate(n)))
+	T* allocate(std::size_t n, T* hint = 0) {
+		if (T* ptr = stack.allocate(sizeof(T) * n,
+					std::alignment_of<T>::value))
 			return ptr;
-		return nullptr; // TODO: Fallback
+		return nullptr;
 	}
 	void deallocate(T *, std::size_t) {
 		// Noop!
