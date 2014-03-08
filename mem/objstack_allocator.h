@@ -4,58 +4,133 @@
 #include <cstddef>
 #include <new>
 #include <memory>
+#include <limits>
+#include "/home/jared/code/libcpp-util/mem/util.h"
+
+template <unsigned N>
+class fixed_objstack {
+private:
+	unsigned char storage[N];
+	std::size_t size;
+
+public:
+	fixed_objstack() : size(N) {
+	}
+
+	void *allocate(std::size_t n, std::size_t alignment) {
+		void *tmp = storage + (N - size);
+		if (!align(alignment, n, tmp, size))
+			return nullptr;
+		size -= n;
+		return tmp;
+	}
+
+	constexpr size_t max_size() const {
+		return N;
+	}
+};
 
 template <unsigned N>
 class objstack {
 private:
-	unsigned char storage[N];
-	unsigned size;
-public:
-	objstack() : size(N) {}
+	struct objstack_node : public fixed_objstack<N> {
+		std::unique_ptr<objstack_node> next;
 
+		objstack_node(std::unique_ptr<objstack_node> &&n) :
+			next(std::move(n)) {
+		}
+	};
+
+	using link = std::unique_ptr<objstack_node>;
+	link head;
+
+	void allocate_new_node() {
+		auto new_head = link(new objstack_node(std::move(head)));
+		head = std::move(new_head);
+	}
+
+public:
 	void *allocate(std::size_t n, std::size_t alignment) {
-		return std::align(n, alignment, storage + (N - size), size);
+		if (!head)
+			allocate_new_node();
+		void *ret = head->allocate(n, alignment);
+		if (ret)
+			return ret;
+		allocate_new_node();
+		return head->allocate(n, alignment);
+	}
+
+	constexpr size_t max_size() const {
+		size_t t = std::numeric_limits<size_t>::max();
+		return t - (t % N);
 	}
 };
 
-template <typename T, unsigned N>
-class objstack_allocator {
+template <typename T, typename Stack>
+class objstack_alloc_base : public no_cxx11_allocators<T> {
 private:
-	std::shared_ptr<objstack<N>> stack;
+	std::shared_ptr<Stack> stack;
+
 public:
+	template <typename U, typename S>
+	friend class objstack_alloc_base;
 	typedef T value_type;
-	objstack_allocator() : stack(std::make_shared()) {}
-	objstack_allocator(objstack_allocator&&) noexcept = default;
-	objstack_allocator(const objstack_allocator&) noexcept = default;
-	objstack_allocator& operator=(objstack_allocator&&) noexcept = default;
-	objstack_allocator& operator=(const objstack_allocator&) noexcept = default;
-	~objstack_allocator() = default;
 
-	template <typename U, unsigned N>
-	objstack_allocator(const objstack_allocator<U, N>& other) noexcept
-       	: stack(other.stack) {} 
+	objstack_alloc_base() : stack(std::make_shared<Stack>()) {
+	}
+	objstack_alloc_base(objstack_alloc_base &&) noexcept = default;
+	objstack_alloc_base(const objstack_alloc_base &) noexcept = default;
+	objstack_alloc_base &
+	operator=(objstack_alloc_base &&) noexcept = default;
+	objstack_alloc_base &
+	operator=(const objstack_alloc_base &) noexcept = default;
+	~objstack_alloc_base() = default;
 
-	T* allocate(std::size_t n, T* hint = 0) {
-		if (T* ptr = stack.allocate(sizeof(T) * n,
-					std::alignment_of<T>::value))
+	template <typename U>
+	struct rebind {
+		typedef objstack_alloc_base<U, Stack> other;
+	};
+
+	template <typename U>
+	objstack_alloc_base(const objstack_alloc_base<U, Stack> &other) noexcept
+	    : stack(other.stack) {
+	}
+
+	T *allocate(std::size_t n, T *hint = 0) {
+		std::size_t bytes = sizeof(T) * n;
+		if (bytes > max_size())
+			return static_cast<T*>(std::malloc(bytes));
+		if (T *ptr = static_cast<T *>(stack->allocate(bytes,
+			std::alignment_of<T>::value)))
 			return ptr;
 		return nullptr;
 	}
-	void deallocate(T *, std::size_t) {
-		// Noop!
+	void deallocate(T *p, std::size_t n) {
+		if (n * sizeof(T) > max_size())
+			std::free(p);
+	}
+
+	std::size_t max_size() const {
+		return stack->max_size();
 	}
 };
 
-template <typename T, unsigned N, typename U, unsigned M>
-bool operator==(const objstack_allocator<T, N> &a,
-		const objstack_allocator<U, M> &b) {
-	return N == M && a.stack == b.stack;
+template <typename T, typename U, typename Stack>
+bool operator==(const objstack_alloc_base<T, Stack> &a,
+		const objstack_alloc_base<U, Stack> &b) {
+	return a.stack == b.stack;
 }
 
-template <typename T, unsigned N, typename U, unsigned M>
-bool operator!=(const objstack_allocator<T, N> &a,
-		const objstack_allocator<U, M> &b) {
+template <typename T, typename U, typename Stack>
+bool operator!=(const objstack_alloc_base<T, Stack> &a,
+		const objstack_alloc_base<U, Stack> &b) {
 	return !(a == b);
 }
+
+template <typename T, unsigned N>
+using objstack_allocator = objstack_alloc_base<T, objstack<N>>;
+
+template <typename T, unsigned N>
+using fixed_objstack_allocator = objstack_alloc_base<T, fixed_objstack<N>>;
 
 #endif
