@@ -4,6 +4,9 @@
 #include <cstddef>
 #include <numeric_limit>
 
+// This allocation scheme is taken from Andrei Alexandrescu's Modern C++ Design.
+// I have tweaked a few things to make it fit better with the C++11 allocation
+// model, as well as use some convenient C++11 features.
 class fixed_allocator {
 private:
 	struct chunk {
