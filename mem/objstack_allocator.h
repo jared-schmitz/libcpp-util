@@ -89,11 +89,14 @@ public:
 	template <typename U>
 	struct rebind {
 		typedef objstack_alloc_base<U, Stack> other;
+		// TODO: Need a static_assert here too.
 	};
 
 	template <typename U>
 	objstack_alloc_base(const objstack_alloc_base<U, Stack> &other) noexcept
 	    : stack(other.stack) {
+		static_assert(sizeof(T) <= other.max_size(), 
+				"Can't allocate objects of type T from rhs");
 	}
 
 	T *allocate(std::size_t n, T *hint = 0) {
