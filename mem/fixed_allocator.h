@@ -39,6 +39,8 @@ private:
 	std::size_t block_size;
 	unsigned char num_blocks;
 
+	chunk *get_next_block_to_allocate_from();
+	void get_block_to_deallocate_from(void *p, size_t block_size);
 public:
 	static constexpr unsigned char max_num_blocks =
 	    std::numeric_limits<unsigned char>::max();
@@ -49,11 +51,17 @@ public:
 	}
 
 	void *allocate() {
-		// TODO: Allocate one block
+		chunk* c = get_next_block_to_allocate_from();
+		--num_blocks;
+		return c->allocate(block_size);
 	}
 
 	void deallocate(void *p) {
-		// TODO: Deallocate one block
+		chunk* c = get_block_to_deallocate_from(p, block_size);
+		if (!c)
+			; // TODO: What do we do on error?
+		++num_blocks;
+		c->deallocate(p, block_size);
 	}
 };
 
