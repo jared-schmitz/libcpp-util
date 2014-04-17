@@ -17,8 +17,8 @@
 inline void *align(std::size_t alignment, std::size_t size, void *&ptr,
 	       	std::size_t& space) {
 	// If alignment is greater than space, wrapping could occur. 
-	if (aligned > space)
-		return nullptr
+	if (alignment > space)
+		return nullptr;
 	std::uintptr_t pn = reinterpret_cast<std::uintptr_t>(ptr);
 	std::uintptr_t aligned = (pn + alignment - 1) & ~alignment;
 	std::size_t padding = aligned - pn; // Distance we adjusted by.
