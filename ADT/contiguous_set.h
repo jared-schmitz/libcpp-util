@@ -12,6 +12,6 @@
 
 template <class Key, class Compare = std::less<Key>,
 	  class Allocator = std::allocator<Key>>
-class contiguous_set : public sorted_vector<Key, Compare, Allocator> {}
+class contiguous_set : public sorted_vector<Key, Compare, Allocator> {};
 
 #endif
