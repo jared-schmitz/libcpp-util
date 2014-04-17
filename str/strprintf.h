@@ -12,32 +12,26 @@
 #include <string>
 #include <cstdarg>
 #include <cstdio>
+#include <utility>
 
 namespace cpputil {
-
-int vstrprintf(std::string& s, string_ref fmt, va_list ap) {
+int vstrprintf(std::string& s, const char* fmt, va_list ap) {
 	// Conformance of implementation to sprintf semantics is paramount
 	// (besides the buffer overflow parts). That said, this can be
 	// implemented MUCH more efficiently. Also sorry MSVC. Come back with
 	// C99.
 	va_list ap2;
 	va_copy(ap2, ap);
-	int count = std::vsnprintf(nullptr, 0, fmt.data(), ap);
-	if (count != -1) {
+	int count = std::vsnprintf(nullptr, 0, fmt, ap);
+	if (count >= 0) {
 		s.resize(count + 1);
-		std::vsnprintf((char*)s.data(), s.size(), fmt.data(), ap2);
+		std::vsnprintf((char*)s.data(), s.size(), fmt, ap2);
 	}
 	va_end(ap2);
 	return count;
 }
 
-std::string vstrprintf(string_ref fmt, va_list ap) {
-	std::string ret;
-	vstrprintf(ret, fmt, ap);
-	return ret;
-}
-
-int strprintf(std::string& s, string_ref fmt, ...) {
+int vstrprintf_private(std::string& s, const char* fmt, ...) {
 	int ret;
 	va_list ap;
 	va_start(ap, fmt);
@@ -46,12 +40,26 @@ int strprintf(std::string& s, string_ref fmt, ...) {
 	return ret;
 }
 
-std::string astrprintf(string_ref fmt, ...) {
-	va_list ap;
+template <typename... Ts>
+int strprintf(std::string& s, const char* fmt, Ts&&... ts) {
+	int count = std::vsnprintf(nullptr, 0, fmt, ts...);
+	if (count >= 0) {
+		s.resize(count + 1);
+		std::vsnprintf((char*)s.data(), s.size(), fmt, ts...);
+	}
+	return count;
+}
+
+std::string vstrprintf(const char* fmt, va_list ap) {
 	std::string ret;
-	va_start(ap, fmt);
 	vstrprintf(ret, fmt, ap);
-	va_end(ap);
+	return ret;
+}
+
+template <typename... Ts>
+std::string astrprintf(const char* fmt, Ts&&... ts) {
+	std::string ret;
+	vstrprintf_private(ret, fmt, std::forward<Ts>(ts)...);
 	return ret;
 }
 
