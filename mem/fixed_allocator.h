@@ -27,8 +27,8 @@ private:
 		~chunk();
 		chunk(const chunk&) = delete;
 		chunk& operator=(const chunk&) = delete;
-		chunk(chunk&&) = default;
-		chunk& operator=(chunk&&) = default;
+		chunk(chunk&&) noexcept = default;
+		chunk& operator=(chunk&&) noexcept = default;
 
 		void *allocate(std::size_t block_size);
 		void deallocate(void *p, std::size_t block_size);
