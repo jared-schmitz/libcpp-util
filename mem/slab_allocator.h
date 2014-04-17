@@ -1,3 +1,13 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
+#ifndef LIBCPP_UTIL_SLAB_ALLOCATOR_H
+#define LIBCPP_UTIL_SLAB_ALLOCATOR_H
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -206,3 +216,4 @@ inline void slab_allocator<T>::deallocate(T* p, std::size_t n) {
 	}
 	slab_allocator_base<T>::get().put_slab_entry(p);
 }
+#endif
