@@ -1,3 +1,10 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
 #ifndef LIBCPP_SORTED_VECTOR_H
 #define LIBCPP_SORTED_VECTOR_H
 

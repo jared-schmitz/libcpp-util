@@ -1,3 +1,13 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
+#ifndef LIBCPP_UTIL_STRING_ALGO_H
+#define LIBCPP_UTIL_STRING_ALGO_H
+
 #include <string>
 #include <vector>
 
@@ -38,3 +48,4 @@ KMP(basic_string_ref<charT, traits> text,
 
 	return basic_string_ref<charT, traits>::npos;
 }
+#endif

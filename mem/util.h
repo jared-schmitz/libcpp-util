@@ -1,5 +1,16 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
 #ifndef LIPCPP_UTIL_ALLOCATOR_UTIL_H
 #define LIPCPP_UTIL_ALLOCATOR_UTIL_H
+
+#include <cstdint>
+#include <cstddef>
+#include <utility>
 
 // libstdc++ as of 3/03/14 has an open bug (TODO: Link to bug-tracker) where
 // std::align is missing.

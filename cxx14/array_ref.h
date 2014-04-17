@@ -1,5 +1,12 @@
-#ifndef ARRAY_REF_H
-#define ARRAY_REF_H
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
+#ifndef LIBCPP_UTIL_ARRAY_REF_H
+#define LIBCPP_UTIL_ARRAY_REF_H
 
 #include <iterator>
 #include <cstddef>
@@ -7,6 +14,9 @@
 #include <array>
 #include <limits>
 #include <stdexcept>
+
+// TODO: This class has been to changed to array_view and is now far more
+// complicated than something I'm interested in implementing. Delete?
 
 // Represents a constant reference to an array. Let's you treat various styles
 // of contiguous storage uniformly (e.g. not having to have 1 million

@@ -1,11 +1,19 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
 #ifndef LIBCPP_UTIL_OBJSTACK_ALLOCATOR_H
 #define LIBCPP_UTIL_OBJSTACK_ALLOCATOR_H
+
+#include "libcpp-util/mem/util.h"
 
 #include <cstddef>
 #include <new>
 #include <memory>
 #include <limits>
-#include "/home/jared/code/libcpp-util/mem/util.h"
 
 template <unsigned N>
 class fixed_objstack {

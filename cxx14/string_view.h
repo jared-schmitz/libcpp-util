@@ -1,3 +1,10 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
 #ifndef LIBCPP_UTIL_STRING_VIEW_H
 #define LIBCPP_UTIL_STRING_VIEW_H
 
@@ -6,7 +13,9 @@
 #include <string>
 #include <bitset>
 #include "libcpp-util/cxx14/array_ref.h"
-#include "string_algo.h"
+#include "libcpp/util/cxx14/string_algo.h"
+
+// TODO: This is far out-of-date with the most recent revision of the TS
 
 template<typename charT, typename traits = std::char_traits<charT>>
 class basic_string_view {

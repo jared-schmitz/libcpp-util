@@ -1,9 +1,19 @@
+//============================================================================
+//                                  libcpp-util
+//                   A simple odds-n-ends library for C++11
+//
+//         Licensed under modified BSD license. See LICENSE for details.
+//============================================================================
+
+#ifndef LIBCPP_UTIL_STRING_REF_H
+#define LIBCPP_UTIL_STRING_REF_H
+
 #include <cstddef>
 #include <limits.h>
 #include <string>
 #include <bitset>
 #include "libcpp-util/cxx14/array_ref.h"
-#include "string_algo.h"
+#include "libcpp-util/cxx14/string_algo.h"
 
 template<typename charT, typename traits = std::char_traits<charT>>
 class basic_string_ref {
@@ -278,3 +288,4 @@ unsigned long long stoull(const wstring_ref & str, size_t * idx=0, int base=10);
 float stof(const wstring_ref & str, size_t * idx=0);
 double stod(const wstring_ref & str, size_t * idx=0);
 long double stold(const wstring_ref & str, size_t * idx=0);
+#endif
