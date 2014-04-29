@@ -19,8 +19,10 @@ public:
 	stdio_file(const char *path, const char *mode)
 		: F(::fopen(path, mode)) {
 	}
+#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
 	stdio_file(int fd, const char *mode) : F(::fdopen(fd, mode)) {
 	}
+#endif
 
 	stdio_file(const stdio_file &) = delete;
 	stdio_file &operator=(const stdio_file &) = delete;
