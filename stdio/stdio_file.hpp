@@ -11,7 +11,61 @@ private:
 
 public:
 	// Ctors/dtor
-	// Assignment/move
+	constexpr stdio_file() : F(nullptr) {
+	}
+	constexpr stdio_file(FILE *F) : F(F) {
+	}
+
+	stdio_file(const char *path, const char *mode)
+		: F(::fopen(path, mode)) {
+	}
+	stdio_file(int fd, const char *mode) : F(::fdopen(fd, mode)) {
+	}
+
+	stdio_file(const stdio_file &) = delete;
+	stdio_file &operator=(const stdio_file &) = delete;
+
+	stdio_file &operator=(FILE *F) {
+		fclose();
+		this->F = F;
+		return *this;
+	}
+
+	stdio_file(stdio_file &&rhs) : F(rhs.F) {
+		rhs.F = nullptr;
+	}
+
+	stdio_file &operator=(stdio_file &&rhs) {
+		fclose();
+		F = rhs.F;
+		rhs.F = nullptr;
+		return *this;
+	}
+
+	~stdio_file() {
+		fclose();
+	}
+
+	// fopen, fdopen, fclose
+	bool fopen(const char *path, const char *mode) {
+		F = ::fopen(path, mode);
+		return F != nullptr;
+	}
+
+	bool fdopen(int fd, const char *mode) {
+		F = ::fdopen(fd, mode);
+		return F != nullptr;
+	}
+
+	int fclose() {
+		if (!F)
+			return EOF;
+		int ret = ::fclose(F);
+		if (ret != EOF)
+			F = nullptr;
+		return ret;
+	}
+
 	FILE *get_file() {
 		return F;
 	}
