@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
+#include <utility>
 
 class stdio_file {
 private:
@@ -28,19 +29,15 @@ public:
 	stdio_file &operator=(const stdio_file &) = delete;
 
 	stdio_file &operator=(FILE *F) {
-		fclose();
-		this->F = F;
+		reset(F);
 		return *this;
 	}
 
-	stdio_file(stdio_file &&rhs) : F(rhs.F) {
-		rhs.F = nullptr;
+	stdio_file(stdio_file &&rhs) : F(rhs.release()) {
 	}
 
 	stdio_file &operator=(stdio_file &&rhs) {
-		fclose();
-		F = rhs.F;
-		rhs.F = nullptr;
+		reset(rhs.release());
 		return *this;
 	}
 
@@ -48,7 +45,22 @@ public:
 		fclose();
 	}
 
-	// fopen, fdopen, fclose
+	FILE *release() {
+		FILE *ret = F;
+		F = nullptr;
+		return ret;
+	}
+
+	void reset(FILE *F) {
+		fclose();
+		this->F = F;
+	}
+
+	void swap(stdio_file &rhs) {
+		std::swap(F, rhs.F);
+	}
+
+	// Following is the stdio interface, wrapped.
 	bool fopen(const char *path, const char *mode) {
 		F = ::fopen(path, mode);
 		return F != nullptr;
@@ -176,4 +188,8 @@ public:
 	}
 #endif
 };
+
+void swap(stdio_file &lhs, stdio_file &rhs) {
+	lhs.swap(rhs);
+}
 #endif
