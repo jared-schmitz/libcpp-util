@@ -25,8 +25,7 @@ public:
 	out_of_luck_allocator(const out_of_luck_allocator<U>& other) {}
 	T *allocate(std::size_t, T* unused = 0) {
 		(void)unused;
-		return exceptions ? throw std::bad_alloc("Out of memory") :
-			nullptr;
+		return exceptions ? throw std::bad_alloc() : nullptr;
 	}
 	void deallocate(T*, std::size_t) {}
 };

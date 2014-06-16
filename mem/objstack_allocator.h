@@ -20,7 +20,6 @@ class fixed_objstack {
 private:
 	unsigned char storage[N];
 	std::size_t size;
-
 public:
 	fixed_objstack() : size(N) {
 	}

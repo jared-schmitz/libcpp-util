@@ -10,10 +10,13 @@
 
 #include "libcpp-util/ADT/contiguous_set.h"
 #include "libcpp-util/mem/util.h"
+#include "libcpp-util/util/shared_singleton.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+
+namespace cpputil {
 
 // This allocation scheme is taken from Andrei Alexandrescu's Modern C++ Design.
 // I have tweaked a few things to make it fit better with the C++11 allocation
@@ -75,7 +78,9 @@ public:
 	void *allocate() {
 		chunk *c = get_next_block_to_allocate_from();
 		--num_blocks_free;
-		return c->allocate(block_size);
+		void *ret = c->allocate(block_size);
+		assert(chunk_contains(c, ret));
+		return ret;
 	}
 
 	void deallocate(void *p) {
@@ -203,10 +208,16 @@ private:
 					  direct_size_compare());
 	}
 
+	small_object_allocator_base() : alloc(nullptr), dealloc(nullptr) {}
 public:
 	void add_storage_size(size_t block_size) {
-		// FIXME: Fix-up the alloc/dealloc pointers if defined.
-		allocators.emplace(block_size, 255);
+		bool space_needed = allocators.size() == allocators.capacity();
+		bool inserted = allocators.emplace(block_size, 255).second;
+
+		if (space_needed && inserted) {
+			alloc = nullptr;
+			dealloc = nullptr;
+		}
 	}
 	void *allocate(size_t block_size) {
 		alloc = get_allocator_for_block_size(block_size, alloc);
@@ -217,16 +228,19 @@ public:
 		dealloc->deallocate(p);
 	}
 
-	static small_object_allocator_base &get() {
-		static small_object_allocator_base impl;
-		return impl;
+	using singleton = shared_singleton<small_object_allocator_base>;
+	friend singleton; // Needs to see private constructor
+	using handle_type = typename singleton::pointer_type;
+	static handle_type get() {
+		static singleton impl;
+		return impl.get();
 	}
 };
 
 template <typename T>
 class small_object_allocator : public no_cxx11_allocators<T> {
 private:
-	small_object_allocator_base &base;
+	typename small_object_allocator_base::handle_type base;
 
 public:
 	typedef T value_type;
@@ -236,27 +250,33 @@ public:
 		typedef small_object_allocator<U> other;
 	};
 	small_object_allocator() : base(small_object_allocator_base::get()) {
-		// TODO: Singleton for base?
-		base.add_storage_size(sizeof(T));
+		base->add_storage_size(sizeof(T));
 	}
 	template <typename U>
-	small_object_allocator(const small_object_allocator<U> &o) {
-		base.add_storage_size(sizeof(T));
+	small_object_allocator(const small_object_allocator<U> &o) :
+		base(small_object_allocator_base::get()) {
+		base->add_storage_size(sizeof(T));
 	}
 
 	T *allocate(size_t n, const T * = 0) {
 		if (n > 1)
 			return static_cast<T *>(::operator new(sizeof(T) * n));
 		else
-			return static_cast<T *>(base.allocate(sizeof(T)));
+			return static_cast<T *>(base->allocate(sizeof(T)));
 	}
 
 	void deallocate(T *p, size_t n) {
 		if (n > 1)
 			::operator delete(p);
 		else
-			base.deallocate(p, sizeof(T));
+			base->deallocate(p, sizeof(T));
+	}
+
+	size_t max_size() const {
+		return std::numeric_limits<size_t>::max();
 	}
 };
+
+}
 
 #endif
