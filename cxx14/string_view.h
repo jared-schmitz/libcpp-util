@@ -13,7 +13,7 @@
 #include <string>
 #include <bitset>
 #include "libcpp-util/cxx14/array_ref.h"
-#include "libcpp/util/cxx14/string_algo.h"
+#include "libcpp-util/cxx14/string_algo.h"
 
 // TODO: This is far out-of-date with the most recent revision of the TS
 
