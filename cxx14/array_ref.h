@@ -60,7 +60,7 @@ public:
 		array_ref(const T (&arr)[N]) : start(arr), len(N) {}
 
 	template <size_t N>
-		array_ref(const std::array<T, N>& arr) : start(arr), len(N) {}
+		array_ref(const std::array<T, N>& arr) : start(arr.data()), len(N) {}
 
 	array_ref(const array_ref&) = default;
 	array_ref& operator=(const array_ref&) = default;
@@ -173,7 +173,7 @@ array_ref<T> make_array_ref(const T* first, const T* last) {
 }
 
 template <typename T>
-array_ref<T> make_array_ref(const std::vector<T> v) {
+array_ref<T> make_array_ref(const std::vector<T>& v) {
 	return v; /* Implicitly constructed */
 }
 
