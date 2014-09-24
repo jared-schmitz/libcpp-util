@@ -176,7 +176,13 @@ public:
 		return vfscanf(get_file(), fmt, ap);
 	}
 
-	stdio_file *freopen(const char *path, const char *mode, stdio_file *f);
+	stdio_file *freopen(const char *path, const char *mode,
+		       	const stdio_file& f) {
+		FILE* newF = freopen(path, mode, get_file());
+		if (newF)
+			F = newF; // Old file is now closed.
+		return newF;
+	}
 
 	int ungetc(int c) {
 		return ::ungetc(c, get_file());

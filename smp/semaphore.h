@@ -16,10 +16,10 @@ namespace cpputil {
 
 class semaphore {
 private:
+	cacheline_spinlock s;
 	std::condition_variable_any cv;
 	unsigned count;
 	unsigned waiters;
-	cacheline_spinlock s;
 
 	semaphore(const semaphore&) = delete;
 	semaphore& operator=(const semaphore&) = delete;
