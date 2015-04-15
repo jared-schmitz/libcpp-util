@@ -82,6 +82,10 @@ public:
 	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {}
 	// TODO: Other standard library type constructors
 	~concurrent_queue() {
+		// XXX: We check if already closed because we don't want to signal
+		// everyone again as we're destroying things.
+		if (is_closed())
+			close();
 		while (head != tail) {
 			alloc.destroy(&fifo[head]);
 			head = (head + 1) % N;
@@ -122,14 +126,14 @@ public:
 		full.post();
 	}
 
-	bool pop_value(T& val) {
+	bool pop(T& val) {
 		full.wait();
 		if (queue_is_finished())
 			return false;
 		return pop_value_common(val);
 	}
 
-	bool try_pop_value(T& val) {
+	bool try_pop(T& val) {
 		if (!full.try_wait())
 			return false;
 		if (queue_is_finished())
