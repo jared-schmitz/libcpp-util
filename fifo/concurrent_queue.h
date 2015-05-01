@@ -22,22 +22,25 @@ namespace cpputil {
 
 template <bool MultiProducer, bool MultiConsumer>
 struct atomic_discipline {
-	typedef std::size_t nonatomic_type;
-	typedef std::atomic_size_t atomic_type;
+private:
+	using nonatomic = std::size_t;
+	using atomic = std::atomic_size_t;
 
-	typedef semaphore sem_type;
-	typedef typename std::conditional<MultiConsumer, atomic_type,
-	       	std::size_t>::type head_index_type;
-	typedef typename std::conditional<MultiProducer, atomic_type,
-		std::size_t>::type tail_index_type;
+	template <bool Atomic>
+	using atomic_t = typename std::conditional<Atomic, atomic,
+					     std::size_t>::type;
 
-	static std::size_t increment_index(std::size_t& index, unsigned N) {
+public:
+	using head_index_type = atomic_t<MultiConsumer>;
+	using tail_index_type = atomic_t<MultiProducer>;
+
+	static std::size_t increment_index(nonatomic& index, unsigned N) {
 		std::size_t tmp = index;
 		index = (index + 1) % N;
 		return tmp;
 	}
 
-	static std::size_t increment_index(atomic_type& index, unsigned N) {
+	static std::size_t increment_index(atomic& index, unsigned N) {
 		std::size_t old_count, new_count;
 		do {
 			old_count = index;
@@ -51,35 +54,74 @@ typedef atomic_discipline<true, false> mpsc_discipline;
 typedef atomic_discipline<false, true> spmc_discipline;
 typedef atomic_discipline<true, true> mpmc_discipline;
 
+// FIXME: This implementation is exception-unsafe. When an exception is thrown
+// while copying an object, a block of undefined bits is left there to be
+// consumed later by a pull operation. Instead check the relevant functions for
+// noexcept and don't release the lock until we have completed putting the item
+// in the queue. If an exception is thrown, decrement the index and rethrow.
 template <typename T, size_t N, class AtomicPolicy,
-	 class Alloc = std::allocator<T>>
+	  class Alloc = std::allocator<T>>
 class concurrent_queue : public AtomicPolicy {
 private:
 	std::atomic_bool open;
 
-	typename AtomicPolicy::sem_type full, empty;
+	std::condition_variable empty_cv, full_cv;
+	std::mutex lock;
+
+	std::size_t full, empty;
 	typename AtomicPolicy::head_index_type head;
 	typename AtomicPolicy::tail_index_type tail;
 
 	concurrent_queue(const concurrent_queue&) = delete;
 	concurrent_queue& operator=(const concurrent_queue&) = delete;
+	concurrent_queue(concurrent_queue&&) = delete;
+	concurrent_queue& operator=(concurrent_queue&&) = delete;
 
 	Alloc alloc;
 	raw_array<T, N> fifo;
 
+	enum class wait_result {
+		ready,
+		closed
+	};
+
+	wait_result wait_for_used_space_or_close() {
+		std::unique_lock<std::mutex> l(lock);
+		while (1) {
+			if (full)
+				return wait_result::ready;
+			else if (!open)
+				return wait_result::closed;
+			full_cv.wait(l);
+		}
+	}
+
+	void wait_for_empty_space() {
+		std::unique_lock<std::mutex> l(lock);
+		while (1) {
+			if (empty)
+				return;
+			empty_cv.wait(l);
+		}
+	}
+
 	bool pop_value_common(T& val) {
 		auto tmp_head = AtomicPolicy::increment_index(head, N);
+		full--;
 		val = std::move(fifo[tmp_head]);
 		alloc.destroy(&fifo[tmp_head]);
-		empty.post();
+		empty++;
+		empty_cv.notify_one();
 		return true;
 	}
 
 	bool queue_is_finished() {
-		return is_closed() && full.value() == 0;
+		return is_closed() && full == 0;
 	}
+
 public:
-	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {}
+	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {
+	}
 	// TODO: Other standard library type constructors
 	~concurrent_queue() {
 		// XXX: We check if already closed because we don't want to signal
@@ -98,7 +140,7 @@ public:
 
 	void close() {
 		open = false;
-		full.post_all(); // Make sure to wake any readers
+		full_cv.notify_all(); // Make sure to wake any readers
 	}
 
 	constexpr size_t capacity() const {
@@ -107,37 +149,61 @@ public:
 
 	template <class... Args>
 	void emplace(Args&&... args) {
-		empty.wait();
+		wait_for_empty_space();
+		empty--;
 		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
 		alloc.construct(&fifo[tmp_tail], std::forward<Args>(args)...);
-		full.post();
+		full++;
+		full_cv.notify_one();
 	}
+
 	void push(const T& val) {
-		empty.wait();
+		wait_for_empty_space();
+		empty--;
 		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
 		alloc.construct(&fifo[tmp_tail], val);
-		full.post();
+		full++;
+		full_cv.notify_one();
 	}
 
 	void push(T&& val) {
-		empty.wait();
+		wait_for_empty_space();
+		empty--;
 		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
 		alloc.construct(&fifo[tmp_tail], std::move(val));
-		full.post();
+		full++;
+		full_cv.notify_one();
+	}
+
+	bool try_push(const T& val) {
+		std::unique_lock<std::mutex> l(lock);
+		if (!empty)
+			return false;
+		empty--;
+		auto tmp_tail = AtomicPolicy::increment_index(tail, N);
+		l.unlock();
+		alloc.construct(&fifo[tmp_tail], val);
+		full++;
+		full_cv.notify_one();
 	}
 
 	bool pop(T& val) {
-		full.wait();
-		if (queue_is_finished())
+		switch (wait_for_used_space_or_close()) {
+		case wait_result::ready:
+			return pop_value_common(val);
+		case wait_result::closed:
 			return false;
-		return pop_value_common(val);
+		}
+		return false; // Shut up compiler.
 	}
 
 	bool try_pop(T& val) {
-		if (!full.try_wait())
+		std::unique_lock<std::mutex> l(lock);
+		if (!full)
 			return false;
 		if (queue_is_finished())
 			return false;
+		l.unlock();
 		return pop_value_common(val);
 	}
 };
