@@ -120,8 +120,10 @@ private:
 	}
 
 public:
-	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {
-	}
+	using value_type = T;
+	using allocator_type = Alloc;
+
+	concurrent_queue() : open(true), full(0), empty(N), head(0), tail(0) {}
 	// TODO: Other standard library type constructors
 	~concurrent_queue() {
 		// XXX: We check if already closed because we don't want to signal

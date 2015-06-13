@@ -1,10 +1,11 @@
 // TODO: Library/license preamble
 
-#ifndef LIPCPP_UTIL_SHARED_SINGLETON
+#ifndef LIBCPP_UTIL_SHARED_SINGLETON
 #define LIBCPP_UTIL_SHARED_SINGLETON
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 
 #include "libcpp-util/smp/spinlock.h"

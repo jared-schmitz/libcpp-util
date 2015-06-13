@@ -15,7 +15,7 @@
 #include <utility>
 
 namespace cpputil {
-int vstrprintf(std::string& s, const char* fmt, va_list ap) {
+inline int vstrprintf(std::string& s, const char* fmt, va_list ap) {
 	// Conformance of implementation to sprintf semantics is paramount
 	// (besides the buffer overflow parts). That said, this can be
 	// implemented MUCH more efficiently. Also sorry MSVC. Come back with
@@ -31,7 +31,7 @@ int vstrprintf(std::string& s, const char* fmt, va_list ap) {
 	return count;
 }
 
-int vstrprintf_private(std::string& s, const char* fmt, ...) {
+inline int vstrprintf_private(std::string& s, const char* fmt, ...) {
 	int ret;
 	va_list ap;
 	va_start(ap, fmt);
@@ -50,7 +50,7 @@ int strprintf(std::string& s, const char* fmt, Ts&&... ts) {
 	return count;
 }
 
-std::string vstrprintf(const char* fmt, va_list ap) {
+inline std::string vstrprintf(const char* fmt, va_list ap) {
 	std::string ret;
 	vstrprintf(ret, fmt, ap);
 	return ret;

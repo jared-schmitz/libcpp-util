@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cassert>
 
+namespace {
 int ascii_to_hex(uintptr_t addr, char *out, int out_len) {
 	// TODO: Replace with guaranteed async-safe impl
 	return snprintf(out, out_len, "0x%016tX", addr);
@@ -37,6 +38,7 @@ char *strcat_end(char *dest, const char *src) {
 	while (*dest)
 		dest++;
 	return strcpy_end(dest, src);
+}
 }
 
 // Simple class to gather up a bunch of information that the signal handler will
@@ -73,7 +75,7 @@ public:
 // TODO: Sweep this up. Use a sane method to build up the string. Remove the
 // async-unsafe functions. Easy since most of them can be replaced with a simple
 // while loop and don't need to be fast.
-void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
+inline void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
 #if defined SIGSTKSZ && defined MINSIGSTKSZ
 	char print_scratch_space[SIGSTKSZ - MINSIGSTKSZ + 128];
 #else
@@ -132,7 +134,7 @@ void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
 #endif
 }
 
-void god_reraise_handler(int signo, siginfo_t *info, void *uctx) {
+inline void god_reraise_handler(int signo, siginfo_t *info, void *uctx) {
 	god_signal_handler(signo, info, uctx);
 
 	struct sigaction sa;
@@ -142,7 +144,7 @@ void god_reraise_handler(int signo, siginfo_t *info, void *uctx) {
 	raise(signo);
 }
 
-int register_to_god_handler(int signo, struct sigaction *new_sa,
+inline int register_to_god_handler(int signo, struct sigaction *new_sa,
 			    bool reraise = true) {
 
 	// Modify the signal action to call the god handler, but preserving the

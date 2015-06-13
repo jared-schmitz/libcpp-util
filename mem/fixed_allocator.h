@@ -91,7 +91,7 @@ public:
 	}
 };
 
-fixed_allocator::chunk::chunk(std::size_t block_size, unsigned char blocks) {
+inline fixed_allocator::chunk::chunk(std::size_t block_size, unsigned char blocks) {
 	data = new unsigned char[block_size * blocks];
 	first_free_block = 0;
 	num_blocks_free = blocks;
@@ -101,11 +101,11 @@ fixed_allocator::chunk::chunk(std::size_t block_size, unsigned char blocks) {
 		*p = ++i;
 }
 
-fixed_allocator::chunk::~chunk() {
+inline fixed_allocator::chunk::~chunk() {
 	delete[] data;
 }
 
-void *fixed_allocator::chunk::allocate(std::size_t block_size) {
+inline void *fixed_allocator::chunk::allocate(std::size_t block_size) {
 	if (num_blocks_free == 0)
 		return nullptr;
 	--num_blocks_free;
@@ -116,7 +116,7 @@ void *fixed_allocator::chunk::allocate(std::size_t block_size) {
 	return ret;
 }
 
-void fixed_allocator::chunk::deallocate(void *p, std::size_t block_size) {
+inline void fixed_allocator::chunk::deallocate(void *p, std::size_t block_size) {
 	unsigned char *release = static_cast<unsigned char *>(p);
 	// Link to the head
 	*release = first_free_block;
@@ -126,7 +126,7 @@ void fixed_allocator::chunk::deallocate(void *p, std::size_t block_size) {
 	++num_blocks_free;
 }
 
-fixed_allocator::chunk *fixed_allocator::get_next_block_to_allocate_from() {
+inline fixed_allocator::chunk *fixed_allocator::get_next_block_to_allocate_from() {
 	// See if the hot block has space
 	if (alloc && alloc->num_blocks_free)
 		return alloc;
@@ -150,17 +150,20 @@ fixed_allocator::chunk *fixed_allocator::get_next_block_to_allocate_from() {
 	return alloc;
 }
 
-fixed_allocator::chunk *
+inline fixed_allocator::chunk *
 fixed_allocator::get_block_to_deallocate_from(void *p, size_t block_size) {
 	if (dealloc && chunk_contains(dealloc, p))
 		return dealloc;
+	chunk* c = nullptr;
 	for (auto &I : storage) {
 		if (chunk_contains(&I, p)) {
 			dealloc = &I;
-			return &I;
+			c = &I;
+			break;
 		}
 	}
-	assert(0 && "Trying to deallocate invalid pointer");
+	assert(c && "Trying to deallocate invalid pointer");
+	return c;
 }
 
 class small_object_allocator_base {
@@ -243,6 +246,9 @@ private:
 	typename small_object_allocator_base::handle_type base;
 
 public:
+	template <typename U>
+	friend class small_object_allocator;
+
 	typedef T value_type;
 
 	template <typename U>
@@ -274,6 +280,16 @@ public:
 
 	size_t max_size() const {
 		return std::numeric_limits<size_t>::max() / sizeof(T);
+	}
+
+	template <typename U>
+	bool operator==(const small_object_allocator<U>& o) const {
+	  return sizeof(T) == sizeof(U) && &base == &o.base;
+	}
+
+	template <typename U>
+	bool operator!=(const small_object_allocator<U>& o) const {
+	  return !(*this == o);
 	}
 };
 
