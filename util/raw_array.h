@@ -16,8 +16,7 @@ namespace cpputil {
 template <class T, size_t N, size_t alignment = std::alignment_of<T>::value>
 class raw_array {
 private:
-	using data_type = typename 
-		std::aligned_storage<sizeof(T), alignment>::type;
+	using data_type = std::aligned_storage_t<sizeof(T), alignment>;
 
 	data_type data[N];
 public:

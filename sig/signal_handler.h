@@ -29,14 +29,11 @@ int ascii_to_hex(uintptr_t addr, char *out, int out_len) {
 char *strcpy_end(char *dest, const char *src) {
 	while ((*dest++ = *src++))
 		/* Nada */;
-	return dest;
+	return dest - 1;
 }
 
 char *strcat_end(char *dest, const char *src) {
-	// Go to end of string
-	while (*dest)
-		dest++;
-	return strcpy_end(dest, src);
+	return strcpy_end(dest + strlen(dest), src);
 }
 
 // Simple class to gather up a bunch of information that the signal handler will
@@ -64,6 +61,7 @@ public:
 	static void put(int i, const char *name) {
 		assert(i < max_signal && "Signal number too large");
 		strncpy(get(i), name, max_name_len);
+		get(i)[max_name_len - 1] = '\0';
 	}
 	static void register_signal(int signo) {
 		put(signo, strsignal(signo));
@@ -79,11 +77,12 @@ void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
 #else
 	char print_scratch_space[512];
 #endif
+	char *end_ptr = print_scratch_space + sizeof(print_scratch_space);
 	char *write_ptr = print_scratch_space;
 
 	// Grab pretty-printed signal information.
 	write_ptr = strcpy_end(write_ptr, lazy_sig_info::get(signo));
-	*write_ptr++ = ' ';
+	write_ptr = strcat_end(write_ptr, " ");
 
 	// Try to write to stderr.
 	int fd = fileno(stderr);
@@ -97,17 +96,14 @@ void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
 	case SIGABRT:
 	case SIGSEGV:
 		ascii_to_hex((uintptr_t)info->si_addr, write_ptr,
-			     print_scratch_space + sizeof(print_scratch_space) -
-				 write_ptr);
+				 end_ptr - write_ptr);
 #ifdef __x86_64__
 		// Dump the instruction that caused the signal
 		struct ucontext *uc = (struct ucontext *)uctx;
 		long insn_addr = uc->uc_mcontext.gregs[REG_RIP];
 		write_ptr = print_scratch_space + strlen(print_scratch_space);
 		write_ptr = strcat_end(write_ptr, " at instruction ");
-		ascii_to_hex(insn_addr, write_ptr,
-			     print_scratch_space + sizeof(print_scratch_space) -
-				 write_ptr);
+		ascii_to_hex(insn_addr, write_ptr, end_ptr - write_ptr);
 #endif
 	}
 
@@ -125,7 +121,7 @@ void god_signal_handler(int signo, siginfo_t *info, void *uctx) {
 	stack_t old_stack;
 	sigaltstack(nullptr, &old_stack);
 	if (old_stack.ss_flags != SS_ONSTACK) {
-		void *stack_frames[64];
+		void *stack_frames[32];
 		int nframes = backtrace(stack_frames, 64);
 		backtrace_symbols_fd(stack_frames, nframes, fd);
 	}
